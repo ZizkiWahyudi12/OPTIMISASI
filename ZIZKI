@@ -1,0 +1,92 @@
+julia> using JuMP
+
+julia> import HiGHS
+
+julia> A = [
+       0 11 0 12 0 0
+       0 0 12 0 0 0
+       0 0 0 0 0 19
+       0 1 0 0 11 0
+       0 0 7 0 0 4
+       0 0 0 0 0 0
+       ]
+6×6 Matrix{Int64}:
+ 0  11   0  12   0   0
+ 0   0  12   0   0   0
+ 0   0   0   0   0  19
+ 0   1   0   0  11   0
+ 0   0   7   0   0   4
+ 0   0   0   0   0   0
+
+julia> n=size(A)[1]
+6
+
+julia> max_flow = Model(HiGHS.Optimizer)
+A JuMP Model
+├ solver: HiGHS
+├ objective_sense: FEASIBILITY_SENSE
+├ num_variables: 0
+├ num_constraints: 0
+└ Names registered in the model: none
+
+julia>
+
+julia> @variable(max_flow, f[1:n, 1:n] >= 0)
+6×6 Matrix{VariableRef}:
+ f[1,1]  f[1,2]  f[1,3]  f[1,4]  f[1,5]  f[1,6]
+ f[2,1]  f[2,2]  f[2,3]  f[2,4]  f[2,5]  f[2,6]
+ f[3,1]  f[3,2]  f[3,3]  f[3,4]  f[3,5]  f[3,6]
+ f[4,1]  f[4,2]  f[4,3]  f[4,4]  f[4,5]  f[4,6]
+ f[5,1]  f[5,2]  f[5,3]  f[5,4]  f[5,5]  f[5,6]
+ f[6,1]  f[6,2]  f[6,3]  f[6,4]  f[6,5]  f[6,6]
+
+julia>
+
+julia> @constraint(max_flow, [i = 1:n, j = 1:n], f[i, j] <= A[i, j])
+6×6 Matrix{ConstraintRef{Model, MathOptInterface.ConstraintIndex{MathOptInterface.ScalarAffineFunction{Float64}, MathOptInterface.LessThan{Float64}}, ScalarShape}}:
+ f[1,1] <= 0  f[1,2] <= 11  …  f[1,5] <= 0   f[1,6] <= 0
+ f[2,1] <= 0  f[2,2] <= 0      f[2,5] <= 0   f[2,6] <= 0
+ f[3,1] <= 0  f[3,2] <= 0      f[3,5] <= 0   f[3,6] <= 19
+ f[4,1] <= 0  f[4,2] <= 1      f[4,5] <= 11  f[4,6] <= 0
+ f[5,1] <= 0  f[5,2] <= 0      f[5,5] <= 0   f[5,6] <= 4
+ f[6,1] <= 0  f[6,2] <= 0   …  f[6,5] <= 0   f[6,6] <= 0
+
+julia>
+
+julia> @constraint(max_flow, [i = 1:n; i != 1 && i != 6], sum(f[i, :]) == sum(f[:, i]))
+JuMP.Containers.SparseAxisArray{ConstraintRef{Model, MathOptInterface.ConstraintIndex{MathOptInterface.ScalarAffineFunction{Float64}, MathOptInterface.EqualTo{Float64}}, ScalarShape}, 1, Tuple{Int64}} with 4 entries:
+  [2]  =  f[2,1] - f[1,2] - f[3,2] - f[4,2] - f[5,2] - f[6,2] + f[2,3] + f[2,4] + f[2,5] + f[2,6] == 0
+  [3]  =  f[3,1] + f[3,2] - f[1,3] - f[2,3] - f[4,3] - f[5,3] - f[6,3] + f[3,4] + f[3,5] + f[3,6] == 0
+  [4]  =  f[4,1] + f[4,2] + f[4,3] - f[1,4] - f[2,4] - f[3,4] - f[5,4] - f[6,4] + f[4,5] + f[4,6] == 0
+  [5]  =  f[5,1] + f[5,2] + f[5,3] + f[5,4] - f[1,5] - f[2,5] - f[3,5] - f[4,5] - f[6,5] + f[5,6] == 0
+
+julia>
+
+julia> @objective(max_flow, Max, sum(f[1, :]))
+f[1,1] + f[1,2] + f[1,3] + f[1,4] + f[1,5] + f[1,6]
+
+julia>
+
+julia> optimize!(max_flow)
+Running HiGHS 1.7.2 (git hash: 5ce7a2753): Copyright (c) 2024 HiGHS under MIT licence terms
+Coefficient ranges:
+  Matrix [1e+00, 1e+00]
+  Cost   [1e+00, 1e+00]
+  Bound  [0e+00, 0e+00]
+  RHS    [1e+00, 2e+01]
+Presolving model
+1 rows, 4 cols, 3 nonzeros  0s
+0 rows, 0 cols, 0 nonzeros  0s
+Presolve : Reductions: rows 0(-40); columns 0(-36); elements 0(-76) - Reduced to empty
+Solving the original LP from the solution after postsolve
+Model   status      : Optimal
+Objective value     :  2.3000000000e+01
+HiGHS run time      :          0.01
+
+julia>
+
+julia> @assert is_solved_and_feasible(max_flow)
+
+julia>
+
+julia> objective_value(max_flow)
